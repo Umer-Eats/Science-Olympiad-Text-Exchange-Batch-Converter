@@ -1,0 +1,16 @@
+data/
+.venv/
+__pycache__/
+*.py[cod]
+*.log
+build/
+dist/
+releases/
+_internal/
+*.exe
+*.spec
+.env
+.env.*
+*.dpapi
+*-log.txt
+qa/

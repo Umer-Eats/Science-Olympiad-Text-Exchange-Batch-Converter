@@ -1,0 +1,23 @@
+{
+  "competition": "Alpha",
+  "eventId": "anatomy-and-physiology",
+  "division": "C",
+  "year": 2026,
+  "sourceUrl": "https://scioly.org/tests",
+  "id": "local-00f1b66a730f5d-c",
+  "level": null,
+  "assets": [
+    {
+      "role": "test",
+      "name": "Alpha Test.pdf",
+      "sha256": "00f1b66a730f5d69cb213c19e817b3dc7860ab36bdc3e4101f396b094ad03384",
+      "path": "sources/00f1b66a730f5d69cb213c19e817b3dc7860ab36bdc3e4101f396b094ad03384.pdf"
+    },
+    {
+      "role": "key",
+      "name": "alpha Answer Key.pdf",
+      "sha256": "0201e1c4470af0f4d3fc2a2f0a182d88e6ac0eac87cf4bf4170e33713e86b2af",
+      "path": "sources/0201e1c4470af0f4d3fc2a2f0a182d88e6ac0eac87cf4bf4170e33713e86b2af.pdf"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+Copy this folder into data/inbox with a unique folder name.
+Edit metadata.json and its id. Add test.pdf, key.pdf and any supplement PDFs.
+The converter picks it up automatically while it is running.
+Do not put unrelated score charts in the folder.

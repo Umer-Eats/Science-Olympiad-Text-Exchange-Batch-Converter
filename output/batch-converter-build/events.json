@@ -1,0 +1,190 @@
+{
+  "B": [
+    {
+      "id": "anatomy-and-physiology",
+      "name": "Anatomy and Physiology"
+    },
+    {
+      "id": "botany",
+      "name": "Botany"
+    },
+    {
+      "id": "disease-detectives",
+      "name": "Disease Detectives"
+    },
+    {
+      "id": "heredity",
+      "name": "Heredity"
+    },
+    {
+      "id": "water-quality",
+      "name": "Water Quality"
+    },
+    {
+      "id": "dynamic-planet",
+      "name": "Dynamic Planet"
+    },
+    {
+      "id": "meteorology",
+      "name": "Meteorology"
+    },
+    {
+      "id": "remote-sensing",
+      "name": "Remote Sensing"
+    },
+    {
+      "id": "rocks-and-minerals",
+      "name": "Rocks and Minerals"
+    },
+    {
+      "id": "solar-system",
+      "name": "Solar System"
+    },
+    {
+      "id": "circuit-lab",
+      "name": "Circuit Lab"
+    },
+    {
+      "id": "crime-busters",
+      "name": "Crime Busters"
+    },
+    {
+      "id": "food-science",
+      "name": "Food Science"
+    },
+    {
+      "id": "hovercraft",
+      "name": "Hovercraft"
+    },
+    {
+      "id": "thermodynamics",
+      "name": "Thermodynamics"
+    },
+    {
+      "id": "boomilever",
+      "name": "Boomilever"
+    },
+    {
+      "id": "elastic-launched-gliders",
+      "name": "Elastic Launched Gliders"
+    },
+    {
+      "id": "roller-coaster",
+      "name": "Roller Coaster"
+    },
+    {
+      "id": "scrambler",
+      "name": "Scrambler"
+    },
+    {
+      "id": "codebusters",
+      "name": "Codebusters"
+    },
+    {
+      "id": "experimental-design",
+      "name": "Experimental Design"
+    },
+    {
+      "id": "ping-pong-parachute",
+      "name": "Ping-Pong Parachute"
+    },
+    {
+      "id": "write-it-do-it",
+      "name": "Write It Do It"
+    }
+  ],
+  "C": [
+    {
+      "id": "anatomy-and-physiology",
+      "name": "Anatomy and Physiology"
+    },
+    {
+      "id": "botany",
+      "name": "Botany"
+    },
+    {
+      "id": "designer-genes",
+      "name": "Designer Genes"
+    },
+    {
+      "id": "disease-detectives",
+      "name": "Disease Detectives"
+    },
+    {
+      "id": "water-quality",
+      "name": "Water Quality"
+    },
+    {
+      "id": "astronomy",
+      "name": "Astronomy"
+    },
+    {
+      "id": "dynamic-planet",
+      "name": "Dynamic Planet"
+    },
+    {
+      "id": "remote-sensing",
+      "name": "Remote Sensing"
+    },
+    {
+      "id": "rocks-and-minerals",
+      "name": "Rocks and Minerals"
+    },
+    {
+      "id": "chemistry-lab",
+      "name": "Chemistry Lab"
+    },
+    {
+      "id": "circuit-lab",
+      "name": "Circuit Lab"
+    },
+    {
+      "id": "forensics",
+      "name": "Forensics"
+    },
+    {
+      "id": "hovercraft",
+      "name": "Hovercraft"
+    },
+    {
+      "id": "protein-modeling",
+      "name": "Protein Modeling"
+    },
+    {
+      "id": "thermodynamics",
+      "name": "Thermodynamics"
+    },
+    {
+      "id": "boomilever",
+      "name": "Boomilever"
+    },
+    {
+      "id": "electric-vehicle",
+      "name": "Electric Vehicle"
+    },
+    {
+      "id": "mission-possible",
+      "name": "Mission Possible"
+    },
+    {
+      "id": "wright-stuff",
+      "name": "Wright Stuff"
+    },
+    {
+      "id": "codebusters",
+      "name": "Codebusters"
+    },
+    {
+      "id": "engineering-cad",
+      "name": "Engineering CAD"
+    },
+    {
+      "id": "experimental-design",
+      "name": "Experimental Design"
+    },
+    {
+      "id": "ping-pong-parachute",
+      "name": "Ping Pong Parachute"
+    }
+  ]
+}

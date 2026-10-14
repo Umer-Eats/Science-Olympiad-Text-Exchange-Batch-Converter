@@ -1,0 +1,56 @@
+{
+  "sourceUrl": "https://scioly.org/tests/example",
+  "division": "C",
+  "eventId": "anatomy-and-physiology",
+  "competition": "Example",
+  "year": 2026,
+  "level": null,
+  "season": 2027,
+  "difficulty": "Easy",
+  "difficultyReason": "Basic recall",
+  "topics": [
+    "Cells"
+  ],
+  "topicMatch": "unverified",
+  "alignment": "Not verified against current rules.",
+  "scoringBasis": "2 points from key",
+  "instructions": "Answer all questions.",
+  "id": "example-c",
+  "sourceId": null,
+  "reviewedOn": "2026-10-13",
+  "gradingMode": "published-key",
+  "minutes": 50,
+  "rulesUrl": "/rules/2027/c/anatomy-and-physiology.pdf",
+  "levelEvidence": null,
+  "questions": [
+    {
+      "id": "1",
+      "page": 1,
+      "prompt": "Which one?",
+      "type": "mcq",
+      "points": 2,
+      "label": "Question 1",
+      "context": "",
+      "options": [
+        {
+          "id": "A",
+          "text": "Correct"
+        },
+        {
+          "id": "B",
+          "text": "Other"
+        }
+      ],
+      "multiple": false
+    }
+  ],
+  "keys": {
+    "1": {
+      "correctOption": "A"
+    }
+  },
+  "questionCount": 1,
+  "maxScore": 2,
+  "paperUrl": "/practice/example-c/test.pdf",
+  "keyUrl": "/practice/example-c/key.pdf"
+}

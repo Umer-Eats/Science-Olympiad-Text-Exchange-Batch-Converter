@@ -1,0 +1,17 @@
+{
+  "competition": "Delta",
+  "eventId": "anatomy-and-physiology",
+  "division": "C",
+  "year": 2026,
+  "sourceUrl": "https://scioly.org/tests",
+  "id": "local-0283896ec1f271-c",
+  "level": null,
+  "assets": [
+    {
+      "role": "test",
+      "name": "Delta Test.pdf",
+      "sha256": "0283896ec1f271029d481ce9fb429256c484499ad73b203f60f73ab95571dde0",
+      "path": "sources/0283896ec1f271029d481ce9fb429256c484499ad73b203f60f73ab95571dde0.pdf"
+    }
+  ]
+}

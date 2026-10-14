@@ -1,0 +1,17 @@
+{
+  "competition": "Beta",
+  "eventId": "anatomy-and-physiology",
+  "division": "C",
+  "year": 2026,
+  "sourceUrl": "https://scioly.org/tests",
+  "id": "local-0274213b1fb4c3-c",
+  "level": null,
+  "assets": [
+    {
+      "role": "test",
+      "name": "Beta Test.pdf",
+      "sha256": "0274213b1fb4c31204f7298f53325ee155d095afd7c156db685c77275e1bdc42",
+      "path": "sources/0274213b1fb4c31204f7298f53325ee155d095afd7c156db685c77275e1bdc42.pdf"
+    }
+  ]
+}
