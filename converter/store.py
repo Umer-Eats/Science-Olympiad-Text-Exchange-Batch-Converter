@@ -25,7 +25,7 @@ def job_id(value):
 
 class Store:
     def __init__(self,home):
-        self.home=Path(home).resolve()
+        self.home=Path(home).resolve();self._asset_checks={}
         for name in ['queue','inbox','sources','jobs','exports','state','logs']:
             (self.home/name).mkdir(parents=True,exist_ok=True)
         with self.db() as db:
@@ -46,6 +46,32 @@ class Store:
             db.commit()
         finally:
             db.close()
+
+    def availability(self,source):
+        valid=[];issues=[]
+        for asset in source.get('assets',[]):
+            name=asset.get('name','PDF');relative=asset.get('path')
+            if not relative:
+                issues.append('Missing file: '+name);continue
+            path=(self.home/relative).resolve()
+            if not path.is_relative_to(self.home) or not path.is_file():
+                issues.append('Missing local file: '+name);continue
+            try:
+                stat=path.stat();cache_key=(str(path),stat.st_size,stat.st_mtime_ns,asset.get('sha256'))
+                ok=self._asset_checks.get(cache_key)
+                if ok is None:
+                    data=path.read_bytes()
+                    ok=data.startswith(b'%PDF-') and hashlib.sha256(data).hexdigest()==asset.get('sha256')
+                    self._asset_checks[cache_key]=ok
+                if not ok:issues.append('Invalid or changed PDF: '+name);continue
+                valid.append(asset)
+            except OSError:issues.append('Cannot read PDF: '+name)
+        test_count=sum(a.get('role')=='test' for a in valid)
+        key_count=sum(a.get('role')=='key' for a in valid)
+        if not test_count:issues.insert(0,'A local test PDF is required.')
+        if not key_count:issues.append('A local published answer key is required for AI repair.')
+        if test_count>1 or key_count>1:issues.append('Combine multiple test or key files before AI repair.')
+        return dict(hasTest=test_count>0,localFiles=len(valid),listedFiles=len(source.get('assets',[])),aiReady=not issues,issues=issues)
 
     def get(self,id):
         with self.db() as db:
@@ -79,8 +105,11 @@ class Store:
         # Asset files are content-addressed and immutable; changes require re-import.
         fp=digest(dict(version=VERSION,source=source))
         with self.db() as db:
-            old=db.execute('SELECT fingerprint FROM jobs WHERE id=?',(id,)).fetchone()
-            if old and old[0]==fp:return
+            old=db.execute('SELECT fingerprint,status FROM jobs WHERE id=?',(id,)).fetchone()
+            if old and old[0]==fp:
+                if old['status']=='awaiting_files' and self.availability(source)['hasTest']:
+                    db.execute("UPDATE jobs SET status='queued',error=NULL WHERE id=?",(id,))
+                return
             db.execute('''INSERT INTO jobs(id,source,fingerprint,status,updated) VALUES(?,?,?,'queued',?)
                           ON CONFLICT(id) DO UPDATE SET source=excluded.source,fingerprint=excluded.fingerprint,
                           status='queued',updated=excluded.updated,approval_hash=NULL,error=NULL''',
@@ -113,6 +142,9 @@ class Store:
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
             row=db.execute("SELECT * FROM jobs WHERE status='queued' ORDER BY updated,id LIMIT 1").fetchone()
+            while row and not self.availability(json.loads(row['source']))['hasTest']:
+                db.execute("UPDATE jobs SET status='awaiting_files',error='A local test PDF is required before extraction.' WHERE id=?",(row['id'],))
+                row=db.execute("SELECT * FROM jobs WHERE status='queued' ORDER BY updated,id LIMIT 1").fetchone()
             if not row:return None
             db.execute("UPDATE jobs SET status='processing',updated=? WHERE id=?",(time.time(),row['id']))
             return dict(row)
@@ -148,5 +180,7 @@ class Store:
             rows=[dict(r) for r in db.execute('SELECT id,source,status,updated,flags,fields,error FROM jobs ORDER BY updated DESC')]
         for r in rows:
             source=json.loads(r.pop('source'))
+            r['availability']=self.availability(source)
+            if not r['availability']['hasTest']:r['status']='awaiting_files'
             r.update({k:source.get(k) for k in ['competition','eventId','division','year']})
         return dict(jobs=rows,paused=self.setting('paused')=='yes',lastScanError=self.setting('last_scan_error'),home=str(self.home),version=VERSION)

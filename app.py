@@ -20,6 +20,7 @@ from converter.engine import convert
 from converter.store import Store, atomic, job_id
 from converter.review import approve, export, validate
 from converter.gemini import AIService, GeminiClient
+from converter.discovery import Discovery, FirecrawlClient
 
 RESOURCES=Path(getattr(sys,'_MEIPASS',Path(__file__).resolve().parent))
 
@@ -92,7 +93,7 @@ def process_queue(store,stop,once=False,limit=None):
             if once:raise
             stop.wait(10)
 
-def make_handler(store,stop,token,port,ai=None):
+def make_handler(store,stop,token,port,ai=None,discovery=None):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
         def allowed_host(self):return self.headers.get('Host') in [f'127.0.0.1:{port}',f'localhost:{port}']
@@ -106,12 +107,14 @@ def make_handler(store,stop,token,port,ai=None):
             if not self.allowed_host():return self.send(403,{'error':'Use the local dashboard address.'})
             path=unquote(urlparse(self.path).path)
             try:
+                if path=='/api/downloads' and discovery:return self.send(200,discovery.public())
                 if path=='/api/status':return self.send(200,store.snapshot())
                 if path=='/api/ai' and ai:return self.send(200,ai.snapshot())
                 if path=='/api/session':return self.send(200,{'token':token})
                 if path=='/api/events':return self.send(200,json.loads((RESOURCES/'events.json').read_text(encoding='utf-8')))
                 if path.startswith('/api/job/'):
                     detail=store.detail(job_id(path.split('/')[-1]));detail['validation']=validate(detail)
+                    detail['availability']=store.availability(detail['source'])
                     detail['aiBusy']=ai.busy(detail['row']['id']) if ai else False
                     return self.send(200,detail)
                 if path=='/health':return self.send(200,{'app':'science-olympiad-batch-converter','running':True})
@@ -122,7 +125,7 @@ def make_handler(store,stop,token,port,ai=None):
                     kind={'.pdf':'application/pdf','.png':'image/png','.zip':'application/zip','.json':'application/json'}[file.suffix]
                     if file.suffix=='.json':return self.send(200,json.loads(file.read_text(encoding='utf-8')))
                     return self.send(200,file.read_bytes(),kind)
-                names={'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8'),'/batch.js':('batch.js','text/javascript; charset=utf-8'),'/ai.js':('ai.js','text/javascript; charset=utf-8')}
+                names={'/downloads.js':('downloads.js','text/javascript; charset=utf-8'),'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8'),'/batch.js':('batch.js','text/javascript; charset=utf-8'),'/ai.js':('ai.js','text/javascript; charset=utf-8')}
                 if path not in names:return self.send(404,{'error':'Not found'})
                 name,kind=names[path];return self.send(200,(RESOURCES/'web'/name).read_bytes(),kind)
             except Exception as error:self.send(400,{'error':str(error)[:1200]})
@@ -136,6 +139,24 @@ def make_handler(store,stop,token,port,ai=None):
                 size=int(self.headers.get('Content-Length','0'))
                 if size<=0 or size>150*1024*1024:raise ValueError('Upload is too large. Use the inbox for PDFs larger than 100 MB.')
                 body=json.loads(self.rfile.read(size));path=urlparse(self.path).path
+                if path.startswith('/api/downloads-'):
+                    if discovery is None:raise ValueError('Download service unavailable. Restart the updated app.')
+                    if path in ('/api/downloads-signin-open','/api/downloads-signin-verify'):
+                        if discovery.thread and discovery.thread.is_alive():raise ValueError('Stop the current search before opening or verifying sign-in.')
+                        if not discovery.key:raise ValueError('Save your Firecrawl key before opening sign-in.')
+                        if path.endswith('-open'):
+                            if body.get('consent') is not True:raise ValueError('Confirm the Firecrawl-hosted browser session first.')
+                            return self.send(200,discovery.signin.open(FirecrawlClient(discovery.key)))
+                        return self.send(200,discovery.signin.verify())
+                    if path=='/api/downloads-signin-close':
+                        discovery.cancel.set();return self.send(200,discovery.signin.close())
+                    if path=='/api/downloads-settings':return self.send(200,discovery.save(body))
+                    if path=='/api/downloads-forget':return self.send(200,discovery.forget())
+                    if path=='/api/downloads-start':return self.send(200,discovery.start(body.get('ids'),body.get('consent') is True))
+                    if path=='/api/downloads-cancel':
+                        discovery.cancel.set();return self.send(200,{'message':'Stopping after the current request. Already saved files are retained.'})
+                    if path=='/api/downloads-attach':return self.send(200,discovery.attach(body.get('id'),body.get('confirmed') is True))
+                    raise ValueError('Unknown download operation.')
                 if path.startswith('/api/ai-'):
                     if ai is None:raise ValueError('AI service is unavailable.')
                     if path=='/api/ai-settings':return self.send(200,ai.keys.save(body))
@@ -247,7 +268,8 @@ def main():
         store.recover();stop=threading.Event()
         if args.once:process_queue(store,stop,once=True,limit=args.limit);return
         ai=AIService(store,stop)
-        server=ThreadingHTTPServer(('127.0.0.1',args.port),make_handler(store,stop,secrets.token_urlsafe(32),args.port,ai))
+        discovery=Discovery(store,stop,ai)
+        server=ThreadingHTTPServer(('127.0.0.1',args.port),make_handler(store,stop,secrets.token_urlsafe(32),args.port,ai,discovery))
         thread=threading.Thread(target=process_queue,args=(store,stop),daemon=True);thread.start()
         ai_thread=threading.Thread(target=ai.loop,daemon=True);ai_thread.start()
         server.timeout=1
@@ -263,6 +285,8 @@ def main():
         except KeyboardInterrupt:pass
         finally:
             stop.set();ai.cancel_all();thread.join(timeout=10);server_thread.join(timeout=3);server.server_close()
+            try:discovery.signin.close()
+            except Exception:logging.warning('Cloud browser close failed; it will expire automatically.')
     finally:lock.__exit__()
 
 if __name__=='__main__':

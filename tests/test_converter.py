@@ -68,8 +68,20 @@ class StoreTests(unittest.TestCase):
         for asset in restored['source']['assets']:
             self.assertEqual(hashlib.sha256((reopened.home/asset['path']).read_bytes()).hexdigest(),asset['sha256'])
 
+    def test_missing_files_are_not_claimed_or_counted_as_local_tests(self):
+        source=self.source();self.store.enqueue(source)
+        self.assertEqual(self.store.snapshot()['jobs'][0]['status'],'awaiting_files')
+        self.assertIsNone(self.store.claim())
+        self.assertEqual(self.store.get(source['id'])['status'],'awaiting_files')
+    def test_deleted_file_disables_ai_readiness(self):
+        id,r=self.prepared();source=self.store.detail(id)['source']
+        self.assertTrue(self.store.availability(source)['aiReady'])
+        (self.store.home/source['assets'][0]['path']).unlink()
+        self.assertFalse(self.store.availability(source)['hasTest'])
+        self.assertEqual(self.store.snapshot()['jobs'][0]['status'],'awaiting_files')
+
     def test_queue_idempotent_and_resume(self):
-        source=self.source();self.store.enqueue(source);row=self.store.claim();self.store.enqueue(source);self.assertEqual(self.store.get(row['id'])['status'],'processing');self.store.recover();self.assertEqual(self.store.get(row['id'])['status'],'queued')
+        source=self.source();path=self.store.home/'test.pdf';path.write_bytes(b'%PDF-queue-fixture');source['assets']=[self.store.add_asset(path,'test')];self.store.enqueue(source);row=self.store.claim();self.store.enqueue(source);self.assertEqual(self.store.get(row['id'])['status'],'processing');self.store.recover();self.assertEqual(self.store.get(row['id'])['status'],'queued')
     def test_approval_export_and_edit_invalidation(self):
         id,r=self.prepared();self.assertEqual(validate(self.store.detail(id)),[]);approve(self.store,id);bundle=export(self.store,id)
         with zipfile.ZipFile(self.store.home/bundle['download'].lstrip('/')) as z:

@@ -196,19 +196,25 @@ class AIService:
     def enqueue(self,ids,auto_approve=True,auto_export=True):
         if not self.keys.key:raise ValueError('Add your Gemini API key in AI settings first.')
         if not isinstance(ids,list) or not 1<=len(ids)<=20:raise ValueError('Choose 1 to 20 tests per AI batch.')
-        added=[];skipped=[]
+        added=[];skipped=[];skip_reasons=[]
         with self.lock:
             for id in dict.fromkeys(ids):
                 job_id(id);detail=self.store.detail(id)
-                if detail['row']['status']!='needs_review' or not detail['draft'] or not detail['review'] or self.busy(id):skipped.append(id);continue
-                if detail['review'].get('sourceFingerprint')!=detail['row']['fingerprint']:skipped.append(id);continue
+                reason=None
+                if self.busy(id):reason='Already queued or being repaired.'
+                elif detail['row']['status']!='needs_review' or not detail['draft'] or not detail['review']:reason='A current extracted draft is required.'
+                if reason:
+                    skipped.append(id);skip_reasons.append(dict(id=id,reason=reason));continue
+                if detail['review'].get('sourceFingerprint')!=detail['row']['fingerprint']:
+                    skipped.append(id);skip_reasons.append(dict(id=id,reason='The source files changed. Refresh the draft before repair.'));continue
                 try:load_documents(self.store,detail)
-                except (ValueError,OSError):skipped.append(id);continue
+                except (ValueError,OSError) as error:
+                    skipped.append(id);skip_reasons.append(dict(id=id,reason=str(error)));continue
                 run=uuid.uuid4().hex
                 with self.store.db() as db:db.execute('INSERT INTO ai_runs VALUES(?,?,?,?,?,?,?,?,?)',(run,id,'queued',self.keys.public()['model'],bool(auto_approve),bool(auto_export),'Waiting for AI repair',time.time(),None))
                 added.append(id)
         self.wake.set()
-        return dict(message=f'{len(added)} tests queued for paid AI repair; {len(skipped)} skipped (missing/invalid PDFs, stale drafts or already busy).',added=added,skipped=skipped)
+        return dict(message=f'{len(added)} tests queued for paid AI repair; {len(skipped)} skipped (missing/invalid PDFs, stale drafts or already busy).',added=added,skipped=skipped,skipReasons=skip_reasons)
     def update(self,id,status,message,report=None):
         with self.store.db() as db:db.execute('UPDATE ai_runs SET status=?,message=?,report=COALESCE(?,report) WHERE id=?',(status,message,report,id))
     def cancel_all(self):

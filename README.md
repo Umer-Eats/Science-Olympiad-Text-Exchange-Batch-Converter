@@ -74,3 +74,25 @@ On the target operating system, install requirements and PyInstaller, then run `
 Run `python -m unittest discover -s tests -v` for structural checks. Run `python app.py --once --limit 20 --home PATH` for a bounded batch without a dashboard. `--headless` runs without a window. `--browser` is an optional fallback; the default is the dedicated desktop window. `--port 8767` selects another port. Only one instance may use a data folder at a time.
 
 If a paper fails, inspect `data/logs/TEST-ID.log`, correct the source and retry. For updated source files, re-import them through the inbox; manual reviews are retained and must be refreshed against the new source before approval. The review screen can reset to the latest extraction while backing up the previous saved review.
+
+## Local files and archive listings
+
+The default review queue shows only entries with an existing local test PDF whose stored checksum matches. Imported archive listings are not downloaded papers. Use the **Listings missing test PDFs** filter to inspect missing entries; they do not count as extracted drafts or enter the processing queue. AI repair is disabled when a required local PDF or answer key is missing. A skipped repair now reports its specific reason. Public archive downloads retain their source links and original-source backups. A combined test-and-key packet may reference the same unchanged PDF in both roles.
+
+## Find missing PDFs with Firecrawl
+
+Open **Find missing PDFs**, enter your own Firecrawl API key (separate from Gemini), and save it. Keys are session-only unless you choose encrypted Windows storage. Select up to 20 tests, confirm credit usage, and click **Find and download**. This is a standalone REST integration and does not use Codex or GPT tokens.
+
+The app scrapes Scioly's public archive, searches for missing filenames with event/competition/year context, and downloads readable public Scioly archive PDFs up to 50 MB. Each run makes at most one archive request plus 16 Firecrawl search/scrape requests per test, covering four missing files per test. Exact SHA-256 matches attach automatically. Other downloaded copies remain candidates: preview and confirm the correct competition, year, division and role before attaching. Prior sources and reviews are backed up, and local extraction is queued; AI repair does not start automatically.
+
+Results and downloaded PDFs survive restart. Interrupted searches do not resume paid requests automatically. Stop search prevents further requests after an in-flight request returns. Sign-in-only documents and external file hosts require manual download. This feature cannot guarantee finding every file or infer missing test/key roles from an incomplete listing. Firecrawl documentation: https://docs.firecrawl.dev/features/search and https://docs.firecrawl.dev/features/scrape .
+
+## Sign in for Scioly account downloads
+
+In **Find missing PDFs**, save your Firecrawl key, accept the cloud-browser credit notice, and click **Open Scioly sign-in**. A Firecrawl interactive browser opens in your default browser. Enter your credentials directly on Scioly there, then return to the converter and click **Verify sign-in**. Signing into an ordinary Chrome tab does not sign in this separate cloud browser.
+
+Once verified, the downloader uses that session to visit selected Scioly test pages and request their download links. Only the expected filename on Scioly or its known PDF host is accepted. It then validates the downloaded PDF and uses the existing checksum/preview confirmation workflow. Unsupported checkout layouts remain unresolved rather than being guessed. Signed URLs and session-control links are not written into download reports or exports.
+
+The temporary browser uses additional Firecrawl credits, expires after at most 30 minutes (or 10 inactive minutes), and is closed when you click **Close session** or exit the app. No persistent Firecrawl profile is created. The converter does not collect your Scioly password, copy cookies from your local browser or store the cloud login on disk. If a verification or download fails because the session expired, open sign-in again. This integration is limited to Scioly; other websites still need manual downloads.
+
+Firecrawl Browser Sandbox API: https://docs.firecrawl.dev/features/browser .
