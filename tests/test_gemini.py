@@ -62,10 +62,31 @@ class GeminiTests(unittest.TestCase):
         id,r=self.prepared();service=self.service(r);service.client_factory=self.service(r,after=service.cancel.set).client_factory
         with self.assertRaisesRegex(ValueError,'cancelled'):self.execute(service,id)
         self.assertEqual(digest(self.store.detail(id)['review']),digest(r))
+    def test_repeat_submission_cannot_queue_active_repair_twice(self):
+        id,r=self.prepared();service=self.service(r)
+        with patch('converter.gemini.load_documents',return_value=DOCUMENTS):
+            first=service.enqueue([id]);second=service.enqueue([id])
+            self.assertEqual(first['added'],[id]);self.assertEqual(second['added'],[])
+            run=service.snapshot()['runs'][0];service.update(run['id'],'running','Repairing')
+            self.assertEqual(service.enqueue([id])['added'],[])
+        self.assertEqual(len(service.snapshot()['runs']),1)
+
     def test_restart_does_not_repeat_paid_requests(self):
         id,r=self.prepared();service=self.service(r)
         with patch('converter.gemini.load_documents',return_value=DOCUMENTS):service.enqueue([id])
         restarted=AIService(self.store,threading.Event());self.assertEqual(restarted.snapshot()['runs'][0]['status'],'interrupted')
+    def test_opaque_key_format_and_quoted_paste(self):
+        settings=KeySettings(self.store)
+        key='AQ.fake-format-test/with+punctuation=='
+        settings.save(dict(key=' "'+key+'" '))
+        self.assertEqual(settings.key,key)
+        self.assertNotIn(key,json.dumps(settings.public()))
+    def test_malformed_key_does_not_replace_saved_key(self):
+        settings=KeySettings(self.store);original='fake_original_key_1234567890'
+        settings.save(dict(key=original))
+        for value in ['short','fake_key_with_internal space_12345','fake_key_with_newline\n1234567890','GEMINI_API_KEY='+original]:
+            with self.assertRaises(ValueError):settings.save(dict(key=value))
+            self.assertEqual(settings.key,original)
     def test_key_is_session_only_and_never_returned(self):
         key='fake_local_test_key_1234567890';settings=KeySettings(self.store);settings.save(dict(key=key,remember=False));self.assertNotIn(key,json.dumps(settings.public()));self.assertFalse(settings.file.exists());self.assertFalse(KeySettings(self.store).key)
     @unittest.skipUnless(os.name=='nt','Windows encryption only')

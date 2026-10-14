@@ -43,7 +43,11 @@ class KeySettings:
         if not re.fullmatch(r'gemini-[a-z0-9.-]{1,90}',model):raise ValueError('Enter a Gemini model ID, such as gemini-3.5-flash-lite.')
         key=str(body.get('key','')).strip()
         if key:
-            if len(key)<20 or not re.fullmatch(r'[A-Za-z0-9_-]+',key):raise ValueError('Check the API key you pasted.')
+            if len(key)>=2 and key[0]==key[-1] and key[0] in ('"', "'"):key=key[1:-1].strip()
+            if not 20<=len(key)<=8192 or any(ord(c)<33 or ord(c)>126 for c in key) or any(c in key for c in ('"', "'")):
+                raise ValueError('The key was not saved or sent to Google. Paste the complete key as one line, without spaces, quotes or surrounding code.')
+            if key.startswith(('GEMINI_API_KEY=', 'GOOGLE_API_KEY=')):
+                raise ValueError('Paste only the key value, without GEMINI_API_KEY= or GOOGLE_API_KEY=.')
         else:key=self.key
         if body.get('remember'):
             if not key:raise ValueError('Enter an API key first.')

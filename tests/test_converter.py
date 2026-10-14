@@ -53,6 +53,21 @@ class StoreTests(unittest.TestCase):
         meta={**source,'season':2027,'difficulty':'Easy','difficultyReason':'Basic recall','topics':['Cells'],'topicMatch':'unverified','alignment':'Not verified against current rules.','scoringBasis':'2 points from key','instructions':'Answer all questions.'}
         review=dict(id=row['id'],sourceFingerprint=row['fingerprint'],metadata=meta,fields=[field],resolutions={'check':'Compared original PDF and key.'},reviewer='Test reviewer',reviewNotes='')
         atomic(folder/'draft.json',draft);self.store.complete(row,folder,draft);self.store.save_review(row['id'],review);return row['id'],review
+    def test_restart_restores_sources_and_saved_review(self):
+        id,review=self.prepared()
+        expected=self.store.detail(id)
+        for role in ['test','key']:
+            (Path(self.temp.name)/(role+'.pdf')).unlink()
+        reopened=Store(self.temp.name)
+        reopened.recover();reopened.scan()
+        restored=reopened.detail(id)
+        self.assertEqual(restored['review'],review)
+        self.assertEqual(restored['row']['status'],'needs_review')
+        self.assertEqual(restored['source'],expected['source'])
+        self.assertEqual(len(reopened.snapshot()['jobs']),1)
+        for asset in restored['source']['assets']:
+            self.assertEqual(hashlib.sha256((reopened.home/asset['path']).read_bytes()).hexdigest(),asset['sha256'])
+
     def test_queue_idempotent_and_resume(self):
         source=self.source();self.store.enqueue(source);row=self.store.claim();self.store.enqueue(source);self.assertEqual(self.store.get(row['id'])['status'],'processing');self.store.recover();self.assertEqual(self.store.get(row['id'])['status'],'queued')
     def test_approval_export_and_edit_invalidation(self):
