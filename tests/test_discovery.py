@@ -1,7 +1,9 @@
+import base64
 import hashlib
 import json
 import threading
 import unittest
+import pymupdf
 import test_converter as fixtures
 from converter.discovery import Discovery,pdf_url,FirecrawlClient
 from converter.store import atomic
@@ -53,6 +55,21 @@ class DownloadTests(unittest.TestCase):
         fresh=Discovery(self.store,threading.Event());self.assertEqual(fresh.public()['status'],'interrupted');self.assertIsNone(fresh.thread)
     def test_cancel_before_search(self):
         service=self.service();service.cancel.set();service.run([],service.key);self.assertEqual(service.public()['status'],'cancelled')
+    def test_local_browser_pdf_import_requires_exact_file_and_confirmation(self):
+        id,_=self.missing();service=self.service();name=self.store.detail(id)['source']['assets'][0]['name']
+        doc=pymupdf.open();doc.new_page().insert_text((40,40),'Different local version');data=doc.tobytes();doc.close()
+        wrong=service.local_import(id,[{'name':'unrelated.pdf','data':base64.b64encode(data).decode()}])
+        self.assertEqual(wrong['results'][0]['status'],'unmatched')
+        self.assertFalse(self.store.availability(self.store.detail(id)['source'])['hasTest'])
+        found=service.local_import(id,[{'name':name,'data':base64.b64encode(data).decode()}])
+        self.assertEqual(found['results'][0]['status'],'candidate')
+        item=service.public()['results'][-1]
+        self.assertEqual(item['url'],'https://scioly.org/tests/example')
+        service.attach(item['id'],True)
+        self.assertTrue(self.store.availability(self.store.detail(id)['source'])['hasTest'])
+    def test_local_browser_import_rejects_fake_pdf(self):
+        id,_=self.missing();service=self.service();name=self.store.detail(id)['source']['assets'][0]['name']
+        with self.assertRaises(ValueError):service.local_import(id,[{'name':name,'data':base64.b64encode(b'%PDF-fake').decode()}])
     def test_only_public_scioly_pdf_destinations(self):
         self.assertTrue(pdf_url(URL))
         for url in ['http://scioly.org/w/images/a.pdf','https://127.0.0.1/a.pdf','https://scioly.org.evil.example/w/images/a.pdf','https://scioly.org:99/w/images/a.pdf','https://user@scioly.org/w/images/a.pdf']:

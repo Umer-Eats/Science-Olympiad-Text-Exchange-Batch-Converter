@@ -1,4 +1,5 @@
 """User-started Firecrawl discovery, bounded downloads and verified local attachment."""
+import base64
 import hashlib
 import json
 import os
@@ -103,6 +104,46 @@ class Discovery:
             if not item or item.get('status')!='candidate':raise ValueError('This download is no longer awaiting confirmation.')
             if not confirmed:raise ValueError('Confirm that the downloaded PDF matches this competition and file role.')
             self.apply(item);self.persist();return {'message':'PDF attached and test queued for extraction. Previous source and review are backed up.'}
+    def local_import(self,job,files):
+        """Attach PDFs the user downloaded in their own browser, without Firecrawl."""
+        if not isinstance(files,list) or not 1<=len(files)<=5:
+            raise ValueError('Choose 1 to 5 downloaded PDFs for one test.')
+        results=[];total=0
+        with self.lock:
+            for incoming in files:
+                name=Path(str(incoming.get('name',''))).name
+                if not name.lower().endswith('.pdf') or not name:
+                    raise ValueError('Choose PDF files only.')
+                try:data=base64.b64decode(incoming.get('data',''),validate=True)
+                except (ValueError,TypeError):raise ValueError('One downloaded file could not be read.') from None
+                total+=len(data)
+                if total>90*1024*1024 or len(data)>50*1024*1024:
+                    raise ValueError('Choose up to 90 MB per import and 50 MB per PDF.')
+                if not data.startswith(b'%PDF-'):
+                    raise ValueError(f'{name} is not a PDF.')
+                try:
+                    with pymupdf.open(stream=data,filetype='pdf') as doc:
+                        if doc.needs_pass or not len(doc):raise ValueError(f'{name} is locked or empty.')
+                except pymupdf.FileDataError:raise ValueError(f'{name} is not a readable PDF.') from None
+                detail=self.store.detail(job);source=detail['source']
+                matches=[(i,a) for i,a in enumerate(source.get('assets',[]))
+                         if a.get('name','').casefold()==name.casefold()
+                         and not self.store.availability({'assets':[a]})['localFiles']]
+                if len(matches)!=1:
+                    results.append({'name':name,'status':'unmatched','message':'Filename does not uniquely match a missing file listed for this test. Check the expected names and try again.'})
+                    continue
+                index,asset=matches[0];sha=hashlib.sha256(data).hexdigest();path=self.store.home/'sources'/(sha+'.pdf')
+                if not path.exists():
+                    temp=path.with_suffix('.'+uuid.uuid4().hex+'.tmp');temp.write_bytes(data);os.replace(temp,path)
+                item={'id':uuid.uuid4().hex,'job':job,'name':name,'role':asset['role'],'assetIndex':index,
+                      'assetDigest':digest(asset),'url':source.get('sourceUrl',''),'path':str(path.relative_to(self.store.home)).replace('\\','/'),
+                      'sha256':sha,'status':'candidate','message':'Imported from your browser. Preview the PDF and confirm its competition, year, division and role.'}
+                if sha==asset.get('sha256'):
+                    try:self.apply(item)
+                    except ValueError as error:item['message']=str(error)+' Confirm attachment after it finishes.'
+                self.add_result(item)
+                results.append({'name':name,'status':item['status'],'message':item['message']})
+        return {'message':f'{sum(r["status"]=="attached" for r in results)} attached, {sum(r["status"]=="candidate" for r in results)} awaiting confirmation, {sum(r["status"]=="unmatched" for r in results)} unmatched.','results':results}
     def apply(self,item):
         detail=self.store.detail(item['job'])
         if detail['row']['status']=='processing' or (self.ai and self.ai.busy(item['job'])):raise ValueError('Wait for this test to finish processing or repairing before attaching files.')

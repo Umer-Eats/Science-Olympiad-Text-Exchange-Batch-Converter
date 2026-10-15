@@ -150,6 +150,16 @@ def make_handler(store,stop,token,port,ai=None,discovery=None):
                         return self.send(200,discovery.signin.verify())
                     if path=='/api/downloads-signin-close':
                         discovery.cancel.set();return self.send(200,discovery.signin.close())
+                    if path=='/api/downloads-local-open':
+                        detail=store.detail(job_id(body.get('id')))
+                        url=detail['source'].get('sourceUrl','');parsed=urlparse(url)
+                        if parsed.scheme!='https' or parsed.hostname!='scioly.org' or parsed.port not in (None,443) or parsed.username or not parsed.path.startswith('/tests/'):
+                            raise ValueError('This test has no safe Scioly page to open.')
+                        opened=webbrowser.open(url)
+                        missing=[a['name'] for a in detail['source'].get('assets',[]) if not store.availability({'assets':[a]})['localFiles']]
+                        return self.send(200,{'message':'Scioly test page opened in your browser.' if opened else 'Use the page link to open Scioly in your browser.','sourceUrl':url,'opened':bool(opened),'expectedFiles':missing})
+                    if path=='/api/downloads-local-import':
+                        return self.send(200,discovery.local_import(job_id(body.get('id')),body.get('files')))
                     if path=='/api/downloads-settings':return self.send(200,discovery.save(body))
                     if path=='/api/downloads-forget':return self.send(200,discovery.forget())
                     if path=='/api/downloads-start':return self.send(200,discovery.start(body.get('ids'),body.get('consent') is True))

@@ -14,7 +14,7 @@ def allowed_download(url):
 
 def live_url(url):
     p=urlparse(url)
-    return p.scheme=='https' and p.hostname in ('liveview.firecrawl.dev','api.firecrawl.dev') and p.port in (None,443) and not p.username
+    return p.scheme=='https' and p.hostname in ('liveview.firecrawl.dev','hangar.firecrawl.dev','api.firecrawl.dev') and p.port in (None,443) and not p.username
 
 class SignIn:
     def __init__(self):

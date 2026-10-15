@@ -31,6 +31,7 @@ class SignInTests(unittest.TestCase):
         self.assertNotIn('signature',json.dumps(session.public()))
     def test_arbitrary_source_and_live_hosts_rejected(self):
         self.assertFalse(live_url('https://evil.example/login'))
+        self.assertTrue(live_url('https://hangar.firecrawl.dev/session-private'))
         self.assertFalse(live_url('https://liveview.firecrawl.dev.evil.example/'))
         self.assertFalse(allowed_download('https://127.0.0.1/file.pdf'))
         self.assertFalse(allowed_download('https://scioly.org/private/account'))

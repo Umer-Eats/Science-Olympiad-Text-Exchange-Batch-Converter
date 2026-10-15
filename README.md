@@ -85,7 +85,11 @@ Open **Find missing PDFs**, enter your own Firecrawl API key (separate from Gemi
 
 The app scrapes Scioly's public archive, searches for missing filenames with event/competition/year context, and downloads readable public Scioly archive PDFs up to 50 MB. Each run makes at most one archive request plus 16 Firecrawl search/scrape requests per test, covering four missing files per test. Exact SHA-256 matches attach automatically. Other downloaded copies remain candidates: preview and confirm the correct competition, year, division and role before attaching. Prior sources and reviews are backed up, and local extraction is queued; AI repair does not start automatically.
 
-Results and downloaded PDFs survive restart. Interrupted searches do not resume paid requests automatically. Stop search prevents further requests after an in-flight request returns. Sign-in-only documents and external file hosts require manual download. This feature cannot guarantee finding every file or infer missing test/key roles from an incomplete listing. Firecrawl documentation: https://docs.firecrawl.dev/features/search and https://docs.firecrawl.dev/features/scrape .
+Results and downloaded PDFs survive restart. Interrupted searches do not resume paid requests automatically. Stop search prevents further requests after an in-flight request returns. For sign-in-only Scioly documents, use the cloud sign-in flow below. Unsupported external file hosts still require manual download. This feature cannot guarantee finding every file or infer missing test/key roles from an incomplete listing. Firecrawl documentation: https://docs.firecrawl.dev/features/search and https://docs.firecrawl.dev/features/scrape .
+
+## Use your own browser for Scioly PDFs
+
+Open **Find missing PDFs** and find a test listing. Click **Open in my browser** to open its Scioly test page in your default browser. Sign in there if Scioly asks, download the listed PDFs yourself, and click **Import PDFs** for that listing. The converter matches exact filenames to missing files, checks that each is a readable PDF, and attaches an exact checksum match automatically. If the PDF differs from the archive checksum, preview it and confirm the match before attaching. This local-browser route uses no Firecrawl credits. Firecrawl searches remain optional for finding public PDFs; Firecrawl cannot reuse login cookies from your regular browser.
 
 ## Sign in for Scioly account downloads
 
