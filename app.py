@@ -150,6 +150,8 @@ def make_handler(store,stop,token,port,ai=None,discovery=None):
                         return self.send(200,discovery.signin.verify())
                     if path=='/api/downloads-signin-close':
                         discovery.cancel.set();return self.send(200,discovery.signin.close())
+                    if path=='/api/downloads-browser-open':return self.send(200,discovery.browser_open(body.get('ids')))
+                    if path=='/api/downloads-browser-check':return self.send(200,discovery.browser_check())
                     if path=='/api/downloads-local-open':
                         detail=store.detail(job_id(body.get('id')))
                         url=detail['source'].get('sourceUrl','');parsed=urlparse(url)

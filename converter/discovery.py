@@ -9,6 +9,7 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+import webbrowser
 from pathlib import Path
 from urllib.parse import urlparse, unquote
 import pymupdf
@@ -58,11 +59,12 @@ class Discovery:
         self.store=store;self.stop=stop;self.ai=ai;self.factory=client_factory;self.downloader=downloader
         self.signin=SignIn();self.lock=threading.RLock();self.cancel=threading.Event();self.thread=None;self.key=''
         self.keyfile=store.home/'state'/'firecrawl-key.dpapi';self.statefile=store.home/'state'/'downloads.json'
-        self.state={'status':'idle','message':'Add a Firecrawl key to find missing PDFs.','results':[]}
+        self.state={'status':'idle','message':'Add a Firecrawl key to find missing PDFs.','results':[],'browser':{'jobs':[],'message':'Select tests, then open them in your browser.'}}
         if self.statefile.exists():
             try:self.state=json.loads(self.statefile.read_text(encoding='utf-8'))
             except (OSError,ValueError):pass
         if self.state['status']=='running':self.state.update(status='interrupted',message='Search stopped when the app closed. Start it again manually; no credits were spent on restart.')
+        self.state.setdefault('browser',{'jobs':[],'message':'Select tests, then open them in your browser.'})
         if self.keyfile.exists() and os.name=='nt':
             try:self.key=crypt(self.keyfile.read_bytes(),True).decode()
             except (ValueError,OSError):pass
@@ -96,6 +98,67 @@ class Discovery:
             self.cancel.clear();self.state={'status':'running','message':'Finding public archive links...','results':self.state.get('results',[])};self.persist()
             self.thread=threading.Thread(target=self.run,args=(list(dict.fromkeys(ids)),self.key),daemon=True);self.thread.start()
         return {'message':'Search started. Keep the app open; do not submit the same batch again.'}
+    def browser_open(self,ids,opener=webbrowser.open):
+        if not isinstance(ids,list) or not 1<=len(ids)<=5:
+            raise ValueError('Choose 1 to 5 tests to open in your browser.')
+        pages=[]
+        for job in dict.fromkeys(ids):
+            detail=self.store.detail(job);source=detail['source'];url=source.get('sourceUrl','');parsed=urlparse(url)
+            if parsed.scheme!='https' or parsed.hostname!='scioly.org' or parsed.port not in (None,443) or parsed.username or not re.fullmatch(r'/tests/[A-Za-z0-9_-]+',parsed.path):
+                raise ValueError('One selected test has no safe Scioly test page. Open its listing individually instead.')
+            missing=[a['name'] for a in source.get('assets',[]) if not self.store.availability({'assets':[a]})['localFiles']]
+            if missing:pages.append((job,url,missing))
+        if not pages:raise ValueError('These listings have no missing files.')
+        opened=[]
+        for job,url,names in pages:
+            if opener(url):opened.append(job)
+        if not opened:raise ValueError('Your default browser could not open the test pages. Use Open in my browser on each listing.')
+        message=f'Opened {len(opened)} Scioly test page'+('s' if len(opened)!=1 else '')+' in your browser. Download the listed PDFs, then click Check Downloads.'
+        with self.lock:
+            self.state['browser']={'jobs':opened,'message':message,'openedAt':time.time()}
+            self.persist()
+        return {'message':message,'opened':len(opened)}
+    def browser_check(self,folder=None):
+        with self.lock:jobs=list(self.state.get('browser',{}).get('jobs',[]))
+        if not jobs:raise ValueError('Open selected test pages in your browser first.')
+        folder=Path(folder) if folder is not None else Path.home()/'Downloads'
+        if not folder.is_dir():raise ValueError('The Downloads folder was not found. Use Import PDFs on a listing instead.')
+        wanted={}
+        for job in jobs:
+            source=self.store.detail(job)['source']
+            for asset in source.get('assets',[]):
+                if not self.store.availability({'assets':[asset]})['localFiles']:
+                    wanted.setdefault(asset['name'].casefold(),None)
+        candidates={name:[] for name in wanted}
+        for path in folder.iterdir():
+            if not path.is_file() or path.suffix.casefold()!='.pdf':continue
+            name=path.name.casefold()
+            if name not in wanted:
+                name=re.sub(r' \(\d+\)(?=\.pdf$)','',name)
+            if name in candidates:candidates[name].append(path)
+        for paths in candidates.values():paths.sort(key=lambda p:p.stat().st_mtime,reverse=True)
+        attached=0;review=0;missing=0;already=0;errors=[]
+        for job in jobs:
+            source=self.store.detail(job)['source']
+            for asset in source.get('assets',[]):
+                if self.store.availability({'assets':[asset]})['localFiles']:continue
+                paths=candidates.get(asset['name'].casefold(),[])
+                if not paths:missing+=1;continue
+                path=paths[0]
+                try:
+                    if path.stat().st_size>50*1024*1024:raise ValueError('PDF exceeds 50 MB')
+                    data=path.read_bytes();sha=hashlib.sha256(data).hexdigest();asset_digest=digest(asset)
+                    with self.lock:
+                        exists=any(r.get('job')==job and r.get('assetDigest')==asset_digest and r.get('sha256')==sha and r.get('status') in ('candidate','attached') for r in self.state['results'])
+                    if exists:already+=1;continue
+                    result=self.local_import(job,[{'name':asset['name'],'data':base64.b64encode(data).decode('ascii')}])['results'][0]
+                    if result['status']=='attached':attached+=1
+                    elif result['status']=='candidate':review+=1
+                except (OSError,ValueError) as error:errors.append(asset['name']+': '+str(error))
+        message=f'{attached} attached, {review} need confirmation, {already} already found, {missing} still missing in Downloads.'
+        if errors:message+=' '+str(len(errors))+' files could not be used; open results or import them manually.'
+        with self.lock:self.state['browser']['message']=message;self.persist()
+        return {'message':message,'attached':attached,'candidates':review,'missing':missing,'errors':errors[:5]}
     def add_result(self,result):
         with self.lock:self.state['results'].append(result);self.persist()
     def attach(self,result_id,confirmed=False):

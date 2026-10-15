@@ -48,9 +48,9 @@ class SignIn:
                 raise
     def verify(self):
         with self.lock:
-            result=self.execute('await page.goto("https://scioly.org/tests", {waitUntil:"domcontentloaded"}); const signedIn=await page.locator("a[href*=\\\"mode=logout\\\"]").count()>0; console.log(JSON.stringify({signedIn}));')
+            result=self.execute('await page.goto("https://scioly.org/tests", {waitUntil:"domcontentloaded"}); const bodyText=await page.locator("body").innerText(); const signedIn=(await page.locator("a[href*=\\\"mode=logout\\\"]").count()>0)||(/Your checked out tests/i.test(bodyText)&&/checkouts remaining/i.test(bodyText)); console.log(JSON.stringify({signedIn}));')
             self.verified=result.get('signedIn') is True
-            self.message='Scioly sign-in verified. Downloads will use this session.' if self.verified else 'Scioly still shows you as signed out. Finish signing in, then verify again.'
+            self.message='Scioly sign-in verified. Downloads will use this session.' if self.verified else 'This Firecrawl browser does not show a Scioly account. If you signed in to regular Chrome, use Browser search below.'
             return {'message':self.message,'verified':self.verified}
     def close(self):
         with self.lock:
@@ -67,7 +67,9 @@ class SignIn:
             code='''
 const source=SOURCE, filename=FILENAME;
 await page.goto(source,{waitUntil:'domcontentloaded'});
-if(await page.locator('a[href*="mode=logout"]').count()===0){console.log(JSON.stringify({needsLogin:true}));}
+const bodyText=await page.locator('body').innerText();
+const signedIn=(await page.locator('a[href*="mode=logout"]').count()>0)||(/Your checked out tests/i.test(bodyText)&&/checkouts remaining/i.test(bodyText));
+if(!signedIn){console.log(JSON.stringify({needsLogin:true}));}
 else {
  const downloads=[];
  const onDownload=d=>downloads.push({name:d.suggestedFilename(),url:d.url()});

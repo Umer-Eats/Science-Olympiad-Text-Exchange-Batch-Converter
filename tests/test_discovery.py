@@ -55,6 +55,22 @@ class DownloadTests(unittest.TestCase):
         fresh=Discovery(self.store,threading.Event());self.assertEqual(fresh.public()['status'],'interrupted');self.assertIsNone(fresh.thread)
     def test_cancel_before_search(self):
         service=self.service();service.cancel.set();service.run([],service.key);self.assertEqual(service.public()['status'],'cancelled')
+    def test_browser_search_opens_page_and_checks_downloads_without_firecrawl(self):
+        id,_=self.missing();service=Discovery(self.store,threading.Event());opened=[]
+        def opener(url):opened.append(url);return True
+        result=service.browser_open([id],opener)
+        self.assertEqual(result['opened'],1);self.assertEqual(opened,['https://scioly.org/tests/example'])
+        name=self.store.detail(id)['source']['assets'][0]['name']
+        folder=self.store.home/'browser-downloads';folder.mkdir()
+        doc=pymupdf.open();doc.new_page().insert_text((40,40),'Local downloaded test');(folder/name).write_bytes(doc.tobytes());doc.close()
+        found=service.browser_check(folder)
+        self.assertEqual(found['candidates'],1)
+        self.assertEqual(service.browser_check(folder)['candidates'],0)
+        self.assertEqual(service.browser_check(folder)['missing'],0)
+        item=service.public()['results'][-1]
+        self.assertEqual(item['status'],'candidate')
+        service.attach(item['id'],True)
+        self.assertTrue(self.store.availability(self.store.detail(id)['source'])['hasTest'])
     def test_local_browser_pdf_import_requires_exact_file_and_confirmation(self):
         id,_=self.missing();service=self.service();name=self.store.detail(id)['source']['assets'][0]['name']
         doc=pymupdf.open();doc.new_page().insert_text((40,40),'Different local version');data=doc.tobytes();doc.close()
