@@ -1,7 +1,7 @@
 @echo off
 cd /d "%~dp0"
 if exist ".venv\Scripts\pythonw.exe" (
-  ".venv\Scripts\python.exe" -c "import webview, pymupdf, rapidocr_onnxruntime" >nul 2>&1
+  ".venv\Scripts\python.exe" -c "import webview, pymupdf, rapidocr_onnxruntime, playwright.sync_api" >nul 2>&1
   if errorlevel 1 ".venv\Scripts\python.exe" -m pip install -r requirements.txt
   if errorlevel 1 goto failed
   start "" ".venv\Scripts\pythonw.exe" app.py

@@ -21,6 +21,7 @@ from converter.store import Store, atomic, job_id
 from converter.review import approve, export, validate
 from converter.gemini import AIService, GeminiClient
 from converter.discovery import Discovery, FirecrawlClient
+from converter.local_browser import LocalBrowser
 
 RESOURCES=Path(getattr(sys,'_MEIPASS',Path(__file__).resolve().parent))
 
@@ -93,7 +94,7 @@ def process_queue(store,stop,once=False,limit=None):
             if once:raise
             stop.wait(10)
 
-def make_handler(store,stop,token,port,ai=None,discovery=None):
+def make_handler(store,stop,token,port,ai=None,discovery=None,local_browser=None):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
         def allowed_host(self):return self.headers.get('Host') in [f'127.0.0.1:{port}',f'localhost:{port}']
@@ -107,7 +108,10 @@ def make_handler(store,stop,token,port,ai=None,discovery=None):
             if not self.allowed_host():return self.send(403,{'error':'Use the local dashboard address.'})
             path=unquote(urlparse(self.path).path)
             try:
-                if path=='/api/downloads' and discovery:return self.send(200,discovery.public())
+                if path=='/api/downloads' and discovery:
+                    state=discovery.public()
+                    state['auto']=local_browser.public() if local_browser else {'status':'unavailable'}
+                    return self.send(200,state)
                 if path=='/api/status':return self.send(200,store.snapshot())
                 if path=='/api/ai' and ai:return self.send(200,ai.snapshot())
                 if path=='/api/session':return self.send(200,{'token':token})
@@ -150,7 +154,18 @@ def make_handler(store,stop,token,port,ai=None,discovery=None):
                         return self.send(200,discovery.signin.verify())
                     if path=='/api/downloads-signin-close':
                         discovery.cancel.set();return self.send(200,discovery.signin.close())
+                    if path=='/api/downloads-auto-start':
+                        if not local_browser:raise ValueError('Automatic local browser unavailable.')
+                        return self.send(200,local_browser.start(body.get('ids'), body.get('continueAll') is True))
+                    if path=='/api/downloads-auto-cancel':
+                        if not local_browser:raise ValueError('Automatic local browser unavailable.')
+                        return self.send(200,local_browser.request_cancel())
                     if path=='/api/downloads-browser-open':return self.send(200,discovery.browser_open(body.get('ids')))
+                    if path=='/api/downloads-browser-download':
+                        if not local_browser:raise ValueError('Automatic local browser unavailable.')
+                        jobs=discovery.public().get('browser',{}).get('jobs',[])
+                        if not jobs:raise ValueError('Open the selected test pages first.')
+                        return self.send(200,local_browser.start(jobs, body.get('continueAll') is True))
                     if path=='/api/downloads-browser-check':return self.send(200,discovery.browser_check())
                     if path=='/api/downloads-local-open':
                         detail=store.detail(job_id(body.get('id')))
@@ -281,7 +296,8 @@ def main():
         if args.once:process_queue(store,stop,once=True,limit=args.limit);return
         ai=AIService(store,stop)
         discovery=Discovery(store,stop,ai)
-        server=ThreadingHTTPServer(('127.0.0.1',args.port),make_handler(store,stop,secrets.token_urlsafe(32),args.port,ai,discovery))
+        local_browser=LocalBrowser(store,discovery,stop)
+        server=ThreadingHTTPServer(('127.0.0.1',args.port),make_handler(store,stop,secrets.token_urlsafe(32),args.port,ai,discovery,local_browser))
         thread=threading.Thread(target=process_queue,args=(store,stop),daemon=True);thread.start()
         ai_thread=threading.Thread(target=ai.loop,daemon=True);ai_thread.start()
         server.timeout=1
@@ -296,7 +312,7 @@ def main():
                 while not stop.wait(1):pass
         except KeyboardInterrupt:pass
         finally:
-            stop.set();ai.cancel_all();thread.join(timeout=10);server_thread.join(timeout=3);server.server_close()
+            stop.set();ai.cancel_all();local_browser.request_cancel();thread.join(timeout=10);server_thread.join(timeout=3);server.server_close()
             try:discovery.signin.close()
             except Exception:logging.warning('Cloud browser close failed; it will expire automatically.')
     finally:lock.__exit__()

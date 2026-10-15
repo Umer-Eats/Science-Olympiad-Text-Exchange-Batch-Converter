@@ -98,9 +98,9 @@ class Discovery:
             self.cancel.clear();self.state={'status':'running','message':'Finding public archive links...','results':self.state.get('results',[])};self.persist()
             self.thread=threading.Thread(target=self.run,args=(list(dict.fromkeys(ids)),self.key),daemon=True);self.thread.start()
         return {'message':'Search started. Keep the app open; do not submit the same batch again.'}
-    def browser_open(self,ids,opener=webbrowser.open):
-        if not isinstance(ids,list) or not 1<=len(ids)<=5:
-            raise ValueError('Choose 1 to 5 tests to open in your browser.')
+    def browser_open(self,ids,opener=None):
+        if not isinstance(ids,list) or not 1<=len(ids)<=10:
+            raise ValueError('Choose 1 to 10 tests to open in your browser.')
         pages=[]
         for job in dict.fromkeys(ids):
             detail=self.store.detail(job);source=detail['source'];url=source.get('sourceUrl','');parsed=urlparse(url)
@@ -109,11 +109,12 @@ class Discovery:
             missing=[a['name'] for a in source.get('assets',[]) if not self.store.availability({'assets':[a]})['localFiles']]
             if missing:pages.append((job,url,missing))
         if not pages:raise ValueError('These listings have no missing files.')
+        if opener is None:opener=lambda url:webbrowser.open(url,new=2)
         opened=[]
         for job,url,names in pages:
             if opener(url):opened.append(job)
         if not opened:raise ValueError('Your default browser could not open the test pages. Use Open in my browser on each listing.')
-        message=f'Opened {len(opened)} Scioly test page'+('s' if len(opened)!=1 else '')+' in your browser. Download the listed PDFs, then click Check Downloads.'
+        message=f'Opened {len(opened)} Scioly test page'+('s' if len(opened)!=1 else '')+' in your browser. Click Download PDFs automatically to save them, or download manually and click Check Downloads.'
         with self.lock:
             self.state['browser']={'jobs':opened,'message':message,'openedAt':time.time()}
             self.persist()
@@ -175,6 +176,7 @@ class Discovery:
         with self.lock:
             for incoming in files:
                 name=Path(str(incoming.get('name',''))).name
+                source_name=Path(str(incoming.get('sourceName') or name)).name
                 if not name.lower().endswith('.pdf') or not name:
                     raise ValueError('Choose PDF files only.')
                 try:data=base64.b64decode(incoming.get('data',''),validate=True)
@@ -190,22 +192,22 @@ class Discovery:
                 except pymupdf.FileDataError:raise ValueError(f'{name} is not a readable PDF.') from None
                 detail=self.store.detail(job);source=detail['source']
                 matches=[(i,a) for i,a in enumerate(source.get('assets',[]))
-                         if a.get('name','').casefold()==name.casefold()
+                         if a.get('name','').casefold()==source_name.casefold()
                          and not self.store.availability({'assets':[a]})['localFiles']]
                 if len(matches)!=1:
-                    results.append({'name':name,'status':'unmatched','message':'Filename does not uniquely match a missing file listed for this test. Check the expected names and try again.'})
+                    results.append({'name':source_name,'status':'unmatched','message':'Filename does not uniquely match a missing file listed for this test. Check the expected names and try again.'})
                     continue
                 index,asset=matches[0];sha=hashlib.sha256(data).hexdigest();path=self.store.home/'sources'/(sha+'.pdf')
                 if not path.exists():
                     temp=path.with_suffix('.'+uuid.uuid4().hex+'.tmp');temp.write_bytes(data);os.replace(temp,path)
-                item={'id':uuid.uuid4().hex,'job':job,'name':name,'role':asset['role'],'assetIndex':index,
+                item={'id':uuid.uuid4().hex,'job':job,'name':source_name,'role':asset['role'],'assetIndex':index,
                       'assetDigest':digest(asset),'url':source.get('sourceUrl',''),'path':str(path.relative_to(self.store.home)).replace('\\','/'),
                       'sha256':sha,'status':'candidate','message':'Imported from your browser. Preview the PDF and confirm its competition, year, division and role.'}
                 if sha==asset.get('sha256'):
                     try:self.apply(item)
                     except ValueError as error:item['message']=str(error)+' Confirm attachment after it finishes.'
                 self.add_result(item)
-                results.append({'name':name,'status':item['status'],'message':item['message']})
+                results.append({'name':source_name,'status':item['status'],'message':item['message']})
         return {'message':f'{sum(r["status"]=="attached" for r in results)} attached, {sum(r["status"]=="candidate" for r in results)} awaiting confirmation, {sum(r["status"]=="unmatched" for r in results)} unmatched.','results':results}
     def apply(self,item):
         detail=self.store.detail(item['job'])

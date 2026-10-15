@@ -71,6 +71,15 @@ class DownloadTests(unittest.TestCase):
         self.assertEqual(item['status'],'candidate')
         service.attach(item['id'],True)
         self.assertTrue(self.store.availability(self.store.detail(id)['source'])['hasTest'])
+    def test_manual_browser_batch_limit_is_ten(self):
+        id,_=self.missing();service=Discovery(self.store,threading.Event())
+        with self.assertRaisesRegex(ValueError,'1 to 10'):
+            service.browser_open([id]*11,lambda url:True)
+        opened=[]
+        result=service.browser_open([id]*10,lambda url:opened.append(url) or True)
+        self.assertEqual(result['opened'],1)
+        self.assertEqual(len(opened),1)
+
     def test_local_browser_pdf_import_requires_exact_file_and_confirmation(self):
         id,_=self.missing();service=self.service();name=self.store.detail(id)['source']['assets'][0]['name']
         doc=pymupdf.open();doc.new_page().insert_text((40,40),'Different local version');data=doc.tobytes();doc.close()
@@ -86,6 +95,19 @@ class DownloadTests(unittest.TestCase):
     def test_local_browser_import_rejects_fake_pdf(self):
         id,_=self.missing();service=self.service();name=self.store.detail(id)['source']['assets'][0]['name']
         with self.assertRaises(ValueError):service.local_import(id,[{'name':name,'data':base64.b64encode(b'%PDF-fake').decode()}])
+    def test_converted_pdf_matches_original_document_listing(self):
+        id,_=self.missing();service=self.service()
+        source=self.store.detail(id)['source'];source['assets'][0]['name']='paper.docx';self.store.enqueue(source)
+        doc=pymupdf.open();doc.new_page().insert_text((40,40),'Converted document');data=doc.tobytes();doc.close()
+        result=service.local_import(id,[{'name':'paper.docx.pdf','sourceName':'paper.docx',
+                                         'data':base64.b64encode(data).decode()}])
+        self.assertEqual(result['results'][0]['status'],'candidate')
+        item=service.public()['results'][-1]
+        self.assertEqual(item['name'],'paper.docx')
+        service.attach(item['id'],True)
+        asset=self.store.detail(id)['source']['assets'][0]
+        self.assertEqual(asset['name'],'paper.docx')
+        self.assertTrue(asset['path'].endswith('.pdf'))
     def test_only_public_scioly_pdf_destinations(self):
         self.assertTrue(pdf_url(URL))
         for url in ['http://scioly.org/w/images/a.pdf','https://127.0.0.1/a.pdf','https://scioly.org.evil.example/w/images/a.pdf','https://scioly.org:99/w/images/a.pdf','https://user@scioly.org/w/images/a.pdf']:

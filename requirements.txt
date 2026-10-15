@@ -1,3 +1,4 @@
 PyMuPDF==1.28.2
 rapidocr-onnxruntime==1.4.4
 pywebview==6.2.1
+playwright==1.64.0

@@ -9,4 +9,4 @@ subprocess.run([sys.executable,'-m','PyInstaller','--noconfirm','--clean','--one
     '--add-data',str(root/'events.json')+':.',
     '--collect-all','rapidocr_onnxruntime','--collect-all','onnxruntime',
     '--collect-all','pymupdf','--collect-all','pyclipper','--collect-all','shapely',
-    '--collect-all','webview','--hidden-import','webview.platforms.winforms','--hidden-import','webview.platforms.edgechromium','--collect-all','cv2','--collect-all','numpy',str(root/'app.py')],cwd=root,check=True)
+    '--collect-all','playwright','--collect-all','webview','--hidden-import','webview.platforms.winforms','--hidden-import','webview.platforms.edgechromium','--collect-all','cv2','--collect-all','numpy',str(root/'app.py')],cwd=root,check=True)
